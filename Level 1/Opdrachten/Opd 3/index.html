@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Developer Workspace Setup — Web UI</title>
+
+  <!-- JSZip + FileSaver from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-6p6W9pS8g4n8v6oYg+Kq9mW8z2p+5K2z8k4rX3p1Q1cQk1sQh8X1yF6s9n3Q8bM0g8x6cA9W9eZp2Zp0g1Xqg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" integrity="sha512-5xjA3mE8r+g5fXbqQz2y2p7n1T2r9q3t6fKj9s2H3Q6cE5mR1V3Y2h1nPq1J2k7X2G4Q6Z6o1b1F9Y8c0d4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; max-width:900px; margin:30px auto; padding:20px; line-height:1.45; }
+    h1 { margin-bottom: 6px; }
+    .card { border:1px solid #e0e0e0; border-radius:8px; padding:16px; margin:12px 0; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+    label { display:block; margin:8px 0 4px; font-weight:600; }
+    input[type=text], input[type=file], select, textarea { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; box-sizing:border-box; }
+    button { padding:8px 12px; border-radius:6px; border:0; background:#4f46e5; color:white; cursor:pointer; }
+    button.secondary { background:#6b7280; }
+    pre { background:#f5f5f7; padding:12px; border-radius:6px; overflow:auto; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .col { flex:1 1 300px; }
+    .small { font-size:0.9em; color:#555; }
+  </style>
+</head>
+<body>
+
+  <h1>Developer Workspace Setup — Web UI</h1>
+  <p class="small">Een browser-frontend om project-templates te genereren, bestanden te back-uppen (zip) en een simpel systeemrapport te maken. Werkt volledig client-side.</p>
+
+  <!-- Project Structure Creator -->
+  <div class="card" id="project-card">
+    <h2>1) Project Structure Creator</h2>
+    <label for="proj-name">Projectnaam</label>
+    <input id="proj-name" type="text" placeholder="voorbeeld-project" />
+
+    <label for="proj-base-readme">Inhoud README.md (optioneel)</label>
+    <textarea id="proj-readme" rows="3" placeholder="Korte omschrijving..."></textarea>
+
+    <div style="margin-top:8px;" class="row">
+      <button id="create-project">Maak project & download ZIP</button>
+      <button id="create-project-preview" class="secondary">Preview bestandslijst</button>
+    </div>
+
+    <div id="proj-preview" style="margin-top:12px; display:none;">
+      <h4>Wat wordt gemaakt</h4>
+      <pre id="proj-filelist"></pre>
+    </div>
+  </div>
+
+  <!-- Backup System -->
+  <div class="card" id="backup-card">
+    <h2>2) Backup System</h2>
+    <label for="backup-files">Selecteer bestanden/folders (meerdere)</label>
+    <input id="backup-files" type="file" multiple webkitdirectory directory />
+
+    <label for="backup-dest">Optionele naam prefix (bijv. mijnbackup)</label>
+    <input id="backup-prefix" type="text" placeholder="mijnbackup" />
+
+    <div style="margin-top:8px;" class="row">
+      <button id="create-backup">Maak backup ZIP</button>
+      <button id="view-backup-log" class="secondary">Bekijk backup log</button>
+    </div>
+
+    <div id="backup-log" style="margin-top:12px; display:none;">
+      <h4>Backup log (localStorage)</h4>
+      <pre id="backup-log-contents"></pre>
+    </div>
+  </div>
+
+  <!-- System Health Check -->
+  <div class="card" id="health-card">
+    <h2>3) System Health Check</h2>
+    <p class="small">Browser-gebaseerde checks: userAgent, online-status en een eenvoudige netwerkfetch.</p>
+
+    <label for="health-host">Ping / Fetch host (defaults: https://example.com)</label>
+    <input id="health-host" type="text" placeholder="https://example.com" value="https://example.com" />
+
+    <div style="margin-top:8px;" class="row">
+      <button id="run-health">Run health check</button>
+      <button id="download-health" class="secondary" disabled>Download laatste rapport</button>
+    </div>
+
+    <div id="health-output" style="margin-top:12px; display:none;">
+      <h4>Laatste rapport</h4>
+      <pre id="health-report"></pre>
+    </div>
+  </div>
+
+  <script>
+    // Utility: timestamp
+    function ts() {
+      const d = new Date();
+      const pad = n => n.toString().padStart(2,'0');
+      return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + '_' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+    }
+
+    // ---------------- Project Creator ----------------
+    document.getElementById('create-project-preview').addEventListener('click', () => {
+      const name = (document.getElementById('proj-name').value || 'new-project').trim();
+      const preview = [
+        `${name}/`,
+        `  src/`,
+        `  docs/`,
+        `  tests/`,
+        `  assets/`,
+        `  README.md`,
+        `  index.html`,
+        `  style.css`
+      ].join('\n');
+      document.getElementById('proj-filelist').textContent = preview;
+      document.getElementById('proj-preview').style.display = 'block';
+    });
+
+    document.getElementById('create-project').addEventListener('click', async () => {
+      const JSZipLib = window.JSZip;
+      if (!JSZipLib) { alert('JSZip niet geladen. Controleer je internetverbinding.'); return; }
+
+      const name = (document.getElementById('proj-name').value || 'new-project').trim();
+      const userReadme = document.getElementById('proj-readme').value || '';
+
+      const zip = new JSZipLib();
+
+      // create folders
+      zip.folder(name).folder('src');
+      zip.folder(name).folder('docs');
+      zip.folder(name).folder('tests');
+      zip.folder(name).folder('assets');
+
+      // README.md
+      const readme = `# ${name}\n\n${userReadme}\n\nGenerated by Developer Workspace Setup (Web UI) at ${new Date().toISOString()}\n`;
+      zip.file(`${name}/README.md`, readme);
+
+      // index.html
+      const indexHtml = `<!doctype html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width,initial-scale=1">\n  <title>${name}</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1>Welcome to ${name}</h1>\n  <p>Project created by Developer Workspace Setup (Web UI)</p>\n</body>\n</html>\n`;
+      zip.file(`${name}/index.html`, indexHtml);
+
+      // style.css
+      const styleCss = `body { font-family: Arial, sans-serif; padding:20px; }\nh1 { color:#333 }\n`;
+      zip.file(`${name}/style.css`, styleCss);
+
+      const content = await zip.generateAsync({type:'blob'});
+      const filename = `${name}_${ts()}.zip`;
+      saveAs(content, filename);
+    });
+
+    // ---------------- Backup System ----------------
+    const BACKUP_LOG_KEY = 'dev_ws_backup_log_v1';
+
+    function appendBackupLog(entry) {
+      const raw = localStorage.getItem(BACKUP_LOG_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      arr.unshift(entry);
+      // keep last 50
+      localStorage.setItem(BACKUP_LOG_KEY, JSON.stringify(arr.slice(0,50)));
+    }
+
+    function showBackupLog() {
+      const raw = localStorage.getItem(BACKUP_LOG_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      if (arr.length === 0) {
+        document.getElementById('backup-log-contents').textContent = 'Geen backups gevonden in localStorage.';
+      } else {
+        document.getElementById('backup-log-contents').textContent = arr.map(e => `${e.timestamp} - ${e.filename} - ${e.items.join(', ')}`).join('\n');
+      }
+      document.getElementById('backup-log').style.display = 'block';
+    }
+
+    document.getElementById('view-backup-log').addEventListener('click', showBackupLog);
+
+    document.getElementById('create-backup').addEventListener('click', async () => {
+      const filesInput = document.getElementById('backup-files');
+      if (!filesInput.files || filesInput.files.length === 0) {
+        alert('Selecteer minimaal 1 bestand of map via de file picker (je kunt een map selecteren in browsers die webkitdirectory ondersteunen).');
+        return;
+      }
+
+      const prefix = (document.getElementById('backup-prefix').value || 'backup').trim();
+      const zip = new JSZip();
+      const items = [];
+
+      // Add files preserving relative path if available (webkitRelativePath)
+      for (const f of filesInput.files) {
+        const path = f.webkitRelativePath || f.name;
+        zip.file(path, f);
+        items.push(path);
+      }
+
+      const filename = `${prefix}_${ts()}.zip`;
+      const blob = await zip.generateAsync({type:'blob'});
+      saveAs(blob, filename);
+
+      // log in localStorage
+      appendBackupLog({ timestamp: new Date().toISOString(), filename: filename, items: items });
+      alert('Backup gemaakt en gedownload: ' + filename);
+    });
+
+    // ---------------- System Health Check ----------------
+    let lastHealthReport = null;
+
+    document.getElementById('run-health').addEventListener('click', async () => {
+      const host = (document.getElementById('health-host').value || 'https://example.com').trim();
+      const reportParts = [];
+      reportParts.push(`System Health Report - ${new Date().toISOString()}`);
+      reportParts.push('');
+      reportParts.push('== Browser Info ==');
+      reportParts.push(`User Agent: ${navigator.userAgent}`);
+      reportParts.push(`Platform: ${navigator.platform || 'n/a'}`);
+      reportParts.push(`Language: ${navigator.language || 'n/a'}`);
+      reportParts.push(`Online: ${navigator.onLine}`);
+      reportParts.push('');
+
+      reportParts.push('== Network Check ==');
+      reportParts.push(`Testing fetch to: ${host}`);
+
+      // Attempt fetch and measure
+      try {
+        const start = performance.now();
+        const resp = await fetch(host, { method: 'HEAD', mode: 'cors' });
+        const took = Math.round(performance.now() - start);
+        reportParts.push(`Fetch status: ${resp.status} (${resp.statusText}), time: ${took}ms`);
+      } catch (err) {
+        reportParts.push(`Fetch error: ${err}`);
+      }
+
+      // Basic connection to DNS-like host via Image trick (best-effort)
+      reportParts.push('');
+      reportParts.push('== Extra checks ==');
+      // Geolocation available?
+      if ('geolocation' in navigator) {
+        reportParts.push('Geolocation: available (user permission required to retrieve full coordinates)');
+      } else {
+        reportParts.push('Geolocation: not available');
+      }
+
+      const content = reportParts.join('\\n');
+      lastHealthReport = content;
+      document.getElementById('health-report').textContent = content;
+      document.getElementById('health-output').style.display = 'block';
+      document.getElementById('download-health').disabled = false;
+    });
+
+    document.getElementById('download-health').addEventListener('click', () => {
+      if (!lastHealthReport) { alert('Geen rapport gevonden. Run eerst de health check.'); return; }
+      const blob = new Blob([lastHealthReport], { type: 'text/plain;charset=utf-8' });
+      saveAs(blob, `system_health_${ts()}.txt`);
+    });
+
+    // small helpers: disable directory picker note for non-supporting browsers
+    (function checkDirSupport(){
+      const input = document.getElementById('backup-files');
+      if (!('webkitdirectory' in input)) {
+        const note = document.createElement('div');
+        note.className = 'small';
+        note.style.marginTop = '8px';
+        note.textContent = 'Opmerking: map-selectie werkt niet in alle browsers. Gebruik Chrome/Edge/Firefox (met beperkingen) of selecteer meerdere bestanden handmatig.';
+        document.getElementById('backup-card').appendChild(note);
+      }
+    })();
+
+  </script>
+</body>
+</html>
