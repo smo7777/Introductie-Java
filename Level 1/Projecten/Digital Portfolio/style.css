@@ -20,11 +20,11 @@ p{
   display: inline-block;
   color: rgb(255, 255, 255);
   border: 2px solid rgb(0, 0, 0);
-  padding: 30px;
+  padding: 40px;
   width: 40%;
-  margin-top: -40px;
+  margin-top: -50px;
   margin-left: 30px;
-  position: relative; bottom: 100px;
+  position: relative; bottom: 220px;
 }
 header {
   background-color: #ffffff;  
@@ -46,10 +46,6 @@ header ul li a {
   text-decoration: none;
   font-weight: bold;
 }
-img source {
-  width: 100%;
-  height: auto;
-}
 footer {
   background-color: #f7f7f7;              
   text-align: center;      
@@ -67,22 +63,22 @@ main {
   flex: 1;
 }
 main img {
-  max-width: 150px;
+  max-width: 220px;
   height: auto;
-  position: relative; left: 350px;
+  position: relative; left: 300px;
+  border-radius: 20%;
+  margin-top: -50px;
 }
-
 footer {
   background-color: #ffffff;           
   text-align: center;  
-  padding: 20px; 
+  padding: 40px; 
 }
 .p2 {
   color: rgb(255, 255, 255);
   background-color: rgb(173, 216, 230);
-  margin: 1px auto; 
-  border: 2px solid black;
-  color: rgb(255, 255, 255);
+  margin: 2px auto; 
+  border: 5px solid black;
 }
 
 
