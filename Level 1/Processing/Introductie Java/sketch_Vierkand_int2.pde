@@ -1,0 +1,12 @@
+size(500,500);
+int jemoeder = 30;
+int jevader = 60;
+int jeoom = 70;
+int jeoma = 100;
+noFill();
+ellipse(jemoeder+100,jevader,jeoom,jeoma);
+ellipse(jemoeder+150,jevader,jeoom,jeoma);
+ellipse(jemoeder+200,jevader,jeoom,jeoma);
+ellipse(jemoeder+130,jevader+50,jeoom,jeoma);
+ellipse(jemoeder+180,jevader+50,jeoom,jeoma);
+ellipse(jemoeder+100,jevader,jeoom,jeoma);

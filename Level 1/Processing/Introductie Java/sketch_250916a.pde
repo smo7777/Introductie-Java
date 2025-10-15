@@ -1,0 +1,11 @@
+size(800, 400);
+background(0, 100, 200);
+fill(255, 100, 0);
+textSize(30);
+text("Oranje tekst hier!", 150, 200);
+fill(100, 255, 150);
+textSize(24);
+text("Groenachtig bericht", 400, 100);
+fill(255);
+textSize(20);
+text("En dit is wit", 600, 300);
